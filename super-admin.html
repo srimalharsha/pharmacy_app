@@ -60,7 +60,7 @@ document.getElementById("pharmacyAccountList").addEventListener("click",async e=
   const next=account.accountActive===false;
   if(!confirm(next?"Activate this pharmacy account?":"Disable this pharmacy account?"))return;
   btn.disabled=true;
-  try{await updateDoc(doc(db,"pharmacyApplications",account.id),{accountActive:next,accountStatusChangedAt:serverTimestamp(),accountStatusChangedBy:auth.currentUser.uid});await updateDoc(doc(db,"pharmacies",account.id),{status:next?"active":"suspended",updatedAt:serverTimestamp()});await updateDoc(doc(db,"userProfiles",account.ownerUid||account.id),{active:next,updatedAt:serverTimestamp()});await writeAudit(next?"pharmacy_account_activated":"pharmacy_account_disabled",{applicationUid:account.id});}
+  try{await updateDoc(doc(db,"pharmacyApplications",account.id),{accountActive:next,accountStatusChangedAt:serverTimestamp(),accountStatusChangedBy:auth.currentUser.uid});await setDoc(doc(db,"pharmacies",account.id),{status:next?"active":"suspended",updatedAt:serverTimestamp()},{merge:true});await setDoc(doc(db,"userProfiles",account.ownerUid||account.id),{active:next,updatedAt:serverTimestamp()},{merge:true});await writeAudit(next?"pharmacy_account_activated":"pharmacy_account_disabled",{applicationUid:account.id});}
   catch(err){alert("Could not change account status: "+(err.message||"Please try again."));btn.disabled=false;}
  }
 });
@@ -78,7 +78,7 @@ document.getElementById("saveAccountSettings").addEventListener("click",async()=
   if(!Number.isInteger(branchLimit)||branchLimit<0||!Number.isInteger(staffLimit)||staffLimit<0)throw new Error("Enter valid whole-number limits. 0 means unlimited.");
   const modules={};document.querySelectorAll("[data-account-module]").forEach(el=>modules[el.dataset.accountModule]=el.checked);
   await updateDoc(doc(db,"pharmacyApplications",selectedAccount.id),{adminSettings:{branchLimit,staffLimit,modules,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid}});
-  await updateDoc(doc(db,"pharmacies",selectedAccount.id),{adminSettings:{branchLimit,staffLimit,modules,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid},updatedAt:serverTimestamp()});
+  await setDoc(doc(db,"pharmacies",selectedAccount.id),{adminSettings:{branchLimit,staffLimit,modules,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid},updatedAt:serverTimestamp()},{merge:true});
   await writeAudit("pharmacy_account_settings_updated",{applicationUid:selectedAccount.id,branchLimit,staffLimit,modules});
   document.getElementById("accountSettingsStatus").textContent="Settings saved successfully.";
  }catch(err){document.getElementById("accountSettingsStatus").textContent=err.message||"Could not save settings.";document.getElementById("accountSettingsStatus").style.color="#b44b40";}
