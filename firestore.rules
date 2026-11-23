@@ -38,11 +38,16 @@ service cloud.firestore {
    allow list: if resource.data.pharmacyId is string && isPharmacyOwner(resource.data.pharmacyId);
    allow create: if isActiveSuperAdmin() || (
     signedIn() && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","createdAt"])
+    && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","invitationId","createdAt"])
     && request.resource.data.email == request.auth.token.email
     && validStaffRole(request.resource.data.role) && request.resource.data.active == true
     && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
     && exists(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId))
+    && get(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId)).data.status == "pending"
+    && get(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+    && get(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId)).data.pharmacyId == request.resource.data.pharmacyId
+    && get(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId)).data.branchId == request.resource.data.branchId
+    && get(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId)).data.role == request.resource.data.role
    );
    allow update: if isActiveSuperAdmin() || (
     resource.data.role != "owner" && resource.data.pharmacyId is string
