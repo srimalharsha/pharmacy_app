@@ -136,13 +136,23 @@ try{
  const cred=await signInWithEmailAndPassword(auth,document.getElementById("loginEmail").value.trim(),document.getElementById("loginPassword").value);
  const admin=await getDoc(doc(db,"platformAdmins",cred.user.uid));
  if(admin.exists()&&admin.data().active===true&&admin.data().role==="superAdmin"){location.href="./super-admin.html";return;}
+ const profile=await getDoc(doc(db,"userProfiles",cred.user.uid));
+ if(profile.exists()&&profile.data().active===true&&profile.data().role==="owner"){
+  const profileData=profile.data();
+  const pharmacy=await getDoc(doc(db,"pharmacies",profileData.pharmacyId));
+  if(pharmacy.exists()&&pharmacy.data().status==="active"){
+   layer.style.display="none";
+   alert("Owner workspace linked successfully. This website is still a DEMO preview; do not enter real pharmacy data yet.");
+   return;
+  }
+ }
  const application=await getDoc(doc(db,"pharmacyApplications",cred.user.uid));
  const applicationData=application.exists()?application.data():null;
  await signOut(auth);
  if(applicationData?.accountActive===false){showLoginMessage("This Pharmacy Account is currently disabled by the platform administrator. Please contact ChannelMed support.");}
  else if(application.exists()&&application.data().status==="pending"){showLoginMessage("Your pharmacy registration is awaiting Super Admin approval. Please verify your email and wait for approval.");}
  else if(application.exists()&&application.data().status==="rejected"){showLoginMessage("Your pharmacy application was not approved. Please contact ChannelMed support.");}
- else{showLoginMessage("This account has no approved Pharmacy Owner or Staff workspace yet.");}
+ else{showLoginMessage("Your application is approved, but the Owner workspace is not linked yet. Ask Super Admin to use Create / Repair Owner Workspace.");}
 }catch(err){const m=err.code==="auth/invalid-credential"?"Email or password is incorrect.":err.code==="auth/too-many-requests"?"Too many attempts. Please try again later.":err.code==="auth/network-request-failed"?"Network error. Check your connection.":err.message||"Unable to sign in.";showLoginMessage(m);}
 finally{loginBtn.disabled=false;loginBtn.textContent="Sign in";}});
 document.getElementById("registrationForm").addEventListener("submit",async e=>{
