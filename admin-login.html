@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102d3a"><title>Super Admin Login | ChannelMed Manager</title>
+<style>
+:root{--navy:#102d3a;--teal:#0f766e;--muted:#718096;--line:#e3ebee}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(140deg,#edf6f5,#f6f8fa 55%,#e9f1f5);font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#18313e;display:grid;place-items:center;padding:22px}
+.wrap{width:min(440px,100%)}.brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:24px}.logo{width:48px;height:48px;border-radius:15px;background:var(--teal);color:white;display:grid;place-items:center;font-size:25px;font-weight:800}.brand strong{display:block;font-size:20px;letter-spacing:-.4px}.brand small{color:var(--muted);font-size:10px;letter-spacing:1.4px;font-weight:800}
+.card{background:white;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 18px 55px #17384512}.eyebrow{color:var(--teal);font-size:10px;font-weight:800;letter-spacing:1.5px}.card h1{font-size:25px;letter-spacing:-.7px;margin:7px 0}.intro{color:var(--muted);margin:0 0 24px}.field{margin:15px 0}.field label{display:block;font-size:12px;font-weight:700;margin-bottom:7px}.field input{width:100%;border:1px solid #dce6e9;border-radius:10px;padding:12px 13px;font:inherit;outline:none}.field input:focus{border-color:#54b8a8;box-shadow:0 0 0 3px #0f766e15}.btn{width:100%;border:0;border-radius:10px;background:var(--teal);color:white;padding:13px;font:700 14px inherit;cursor:pointer;margin-top:7px}.btn:disabled{opacity:.55;cursor:not-allowed}.notice{margin-top:17px;padding:12px;border-radius:10px;background:#fff7e8;color:#8b5c16;font-size:11px}.notice strong{display:block;margin-bottom:3px}.back{display:block;text-align:center;margin-top:19px;color:var(--teal);text-decoration:none;font-weight:700;font-size:12px}.foot{text-align:center;color:#8a9aa1;font-size:10px;margin-top:18px}
+@media(max-width:480px){.card{padding:24px 20px}}
+</style></head>
+<body><main class="wrap">
+<div class="brand"><div class="logo">✚</div><div><strong>ChannelMed Manager</strong><small>SUPER ADMIN PORTAL</small></div></div>
+<section class="card">
+<div class="eyebrow">RESTRICTED ACCESS</div><h1>Super Admin Login</h1><p class="intro">Sign in to manage pharmacy accounts, subscriptions, payments, branches and system settings.</p>
+<form id="loginForm">
+<div class="field"><label for="email">Admin email</label><input id="email" type="email" autocomplete="username" placeholder="Enter your admin email" required></div>
+<div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></div>
+<button class="btn" type="submit" disabled>Authentication setup pending</button>
+</form>
+<div class="notice"><strong>Login security setup is not connected yet.</strong>This preview does not accept or store passwords. Firebase Authentication and a server-verified Super Admin role must be configured before sign-in can be enabled.</div>
+<a class="back" href="./index.html">← Back to ChannelMed preview</a>
+</section><div class="foot">ChannelMed Manager · Secure administration</div>
+</main>
+<script>document.getElementById('loginForm').addEventListener('submit',e=>e.preventDefault());</script>
+</body></html>
