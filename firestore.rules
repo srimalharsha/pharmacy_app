@@ -13,7 +13,7 @@ service cloud.firestore {
     && profile().active == true && profile().pharmacyId == pharmacyId;
   }
   function isPharmacyOwner(pharmacyId){return isPharmacyMember(pharmacyId) && profile().role == "owner";}
-  function validStaffRole(role){return role in ["branchManager","staff"];}
+  function validStaffRole(role){return role == "staff";}
   match /platformAdmins/{uid}{
    allow get: if signedIn() && request.auth.uid == uid;
    allow list,create,update,delete: if false;
@@ -38,7 +38,7 @@ service cloud.firestore {
    allow list: if resource.data.pharmacyId is string && isPharmacyOwner(resource.data.pharmacyId);
    allow create: if isActiveSuperAdmin() || (
     signedIn() && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","invitationId","createdAt"])
+    && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","permissions","invitationId","createdAt"])
     && request.resource.data.email == request.auth.token.email
     && request.resource.data.createdAt == request.time
     && validStaffRole(request.resource.data.role) && request.resource.data.active == true
@@ -53,7 +53,7 @@ service cloud.firestore {
    allow update: if isActiveSuperAdmin() || (
     resource.data.role != "owner" && resource.data.pharmacyId is string
     && isPharmacyOwner(resource.data.pharmacyId)
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["active","role","branchId"])
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["active","role","branchId","permissions"])
     && validStaffRole(request.resource.data.role)
     && request.resource.data.active is bool
     && exists(/databases/$(database)/documents/pharmacies/$(resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
@@ -65,7 +65,7 @@ service cloud.firestore {
     && request.resource.data.createdBy == request.auth.uid
     && request.resource.data.pharmacyId is string && isPharmacyOwner(request.resource.data.pharmacyId)
     && request.resource.data.email is string && request.resource.data.name is string
-    && request.resource.data.role in ["branchManager","staff"]
+    && request.resource.data.role == "staff"
     && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
     && request.resource.data.keys().hasOnly(["email","name","phone","role","branchId","pharmacyId","status","createdBy","createdAt"]);
    allow get: if isActiveSuperAdmin() || (signedIn() && resource.data.email == request.auth.token.email);
