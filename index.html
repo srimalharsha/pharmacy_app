@@ -137,8 +137,10 @@ try{
  const admin=await getDoc(doc(db,"platformAdmins",cred.user.uid));
  if(admin.exists()&&admin.data().active===true&&admin.data().role==="superAdmin"){location.href="./super-admin.html";return;}
  const application=await getDoc(doc(db,"pharmacyApplications",cred.user.uid));
+ const applicationData=application.exists()?application.data():null;
  await signOut(auth);
- if(application.exists()&&application.data().status==="pending"){showLoginMessage("Your pharmacy registration is awaiting Super Admin approval. Please verify your email and wait for approval.");}
+ if(applicationData?.accountActive===false){showLoginMessage("This Pharmacy Account is currently disabled by the platform administrator. Please contact ChannelMed support.");}
+ else if(application.exists()&&application.data().status==="pending"){showLoginMessage("Your pharmacy registration is awaiting Super Admin approval. Please verify your email and wait for approval.");}
  else if(application.exists()&&application.data().status==="rejected"){showLoginMessage("Your pharmacy application was not approved. Please contact ChannelMed support.");}
  else{showLoginMessage("This account has no approved Pharmacy Owner or Staff workspace yet.");}
 }catch(err){const m=err.code==="auth/invalid-credential"?"Email or password is incorrect.":err.code==="auth/too-many-requests"?"Too many attempts. Please try again later.":err.code==="auth/network-request-failed"?"Network error. Check your connection.":err.message||"Unable to sign in.";showLoginMessage(m);}
