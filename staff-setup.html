@@ -11,9 +11,9 @@ try{
  if(!isSignInWithEmailLink(auth,location.href))throw new Error("Please open the original invitation link from your email on this device.");
  const cred=await signInWithEmailLink(auth,email,location.href),invRef=doc(db,"staffInvitations",inviteId),invSnap=await getDoc(invRef);
  if(!invSnap.exists())throw new Error("Invitation not found. Contact your Pharmacy Owner.");
- const inv=invSnap.data();if(inv.status!=="pending"||inv.email!==String(cred.user.email||"").toLowerCase())throw new Error("This invitation is no longer valid or the email does not match.");
+ const inv=invSnap.data();if(inv.status!=="pending"||inv.role!=="staff"||inv.email!==String(cred.user.email||"").toLowerCase())throw new Error("This invitation is no longer valid or the email does not match.");
  await updatePassword(cred.user,password);
- await setDoc(doc(db,"userProfiles",cred.user.uid),{displayName:inv.name,email:cred.user.email,phone:inv.phone||"",role:inv.role,pharmacyId:inv.pharmacyId,branchId:inv.branchId,active:true,invitationId:inviteId,createdAt:serverTimestamp()});
+ await setDoc(doc(db,"userProfiles",cred.user.uid),{displayName:inv.name,email:cred.user.email,phone:inv.phone||"",role:"staff",pharmacyId:inv.pharmacyId,branchId:inv.branchId,active:true,permissions:{},invitationId:inviteId,createdAt:serverTimestamp()});
  await updateDoc(invRef,{status:"accepted",acceptedUid:cred.user.uid,acceptedAt:serverTimestamp()});
  location.href="./staff-dashboard.html";
 }catch(err){console.error(err);msg.textContent=err.code==="auth/weak-password"?"Please choose a stronger password.":(err.message||"Could not complete setup.");btn.disabled=false;}
