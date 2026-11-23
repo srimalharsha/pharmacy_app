@@ -1,16 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A platform admin can read only their own registry entry.
-    // Create/update this document manually in Firebase Console after creating
-    // the admin's Authentication account. Client-side role escalation is denied.
+    function isActiveSuperAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.role == "superAdmin";
+    }
+
+    // Admin registry records are provisioned manually or by trusted server code.
     match /platformAdmins/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, create, update, delete: if false;
     }
 
-    // Deny all application data access until tenant-specific rules are added.
-    // Do not loosen this default rule to make the demo work.
+    // Super Admin controlled platform configuration.
+    match /platformConfig/{configId} {
+      allow get, list, create, update: if isActiveSuperAdmin();
+      allow delete: if false;
+    }
+    match /subscriptionPlans/{planId} {
+      allow get, list, create, update: if isActiveSuperAdmin();
+      allow delete: if false;
+    }
+    match /platformAuditLogs/{logId} {
+      allow create: if isActiveSuperAdmin()
+        && request.resource.data.adminUid == request.auth.uid;
+      allow get, list: if isActiveSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // Deny every other collection until its tenant-safe workflow is implemented.
     match /{document=**} {
       allow read, write: if false;
     }
