@@ -13,7 +13,7 @@ service cloud.firestore {
     && profile().active == true && profile().pharmacyId == pharmacyId;
   }
   function isPharmacyOwner(pharmacyId){return isPharmacyMember(pharmacyId) && profile().role == "owner";}
-  function validStaffRole(role){return role in ["branchManager","pharmacist","cashier"];}
+  function validStaffRole(role){return role in ["branchManager","staff"];}
   match /platformAdmins/{uid}{
    allow get: if signedIn() && request.auth.uid == uid;
    allow list,create,update,delete: if false;
