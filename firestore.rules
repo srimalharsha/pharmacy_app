@@ -14,6 +14,35 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    // Pharmacy owners may submit one application tied to their own Auth UID.
+    match /pharmacyApplications/{uid} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.pharmacyName is string
+        && request.resource.data.pharmacyName.size() >= 2
+        && request.resource.data.pharmacyName.size() <= 120
+        && request.resource.data.ownerName is string
+        && request.resource.data.ownerName.size() >= 2
+        && request.resource.data.ownerName.size() <= 100
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() >= 7
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.address is string
+        && request.resource.data.address.size() >= 5
+        && request.resource.data.address.size() <= 300
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.planId in ["monthly", "yearly"]
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly(["ownerUid", "pharmacyName", "ownerName", "phone", "address", "email", "planId", "status", "createdAt"]);
+      allow get: if (request.auth != null && request.auth.uid == uid)
+        || isActiveSuperAdmin();
+      allow list: if isActiveSuperAdmin();
+      allow update, delete: if isActiveSuperAdmin();
+    }
+
     // Super Admin controlled platform configuration.
     match /platformConfig/{configId} {
       allow get, list, create, update: if isActiveSuperAdmin();
