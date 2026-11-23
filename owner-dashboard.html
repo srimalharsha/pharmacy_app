@@ -102,7 +102,7 @@ async function loadStaff(){
 }
 document.getElementById("staffInviteForm").addEventListener("submit",async e=>{
  e.preventDefault();const btn=document.getElementById("sendStaffInvite");btn.disabled=true;btn.textContent="Sending…";
- const name=document.getElementById("staffName").value.trim(),email=document.getElementById("staffEmail").value.trim(),phone=document.getElementById("staffPhone").value.trim(),role=document.getElementById("staffRole").value,branchId=document.getElementById("staffBranch").value;
+ const name=document.getElementById("staffName").value.trim(),email=document.getElementById("staffEmail").value.trim().toLowerCase(),phone=document.getElementById("staffPhone").value.trim(),role=document.getElementById("staffRole").value,branchId=document.getElementById("staffBranch").value;
  try{
   if(!branchId||!ownerBranches.some(b=>b.id===branchId))throw new Error("Please select a valid branch.");
   if(email.toLowerCase()===String(auth.currentUser.email||"").toLowerCase())throw new Error("Owner email cannot be invited as staff.");
