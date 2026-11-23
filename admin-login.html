@@ -8,12 +8,12 @@
 <div class="error" id="errorBox" role="alert"></div><div class="notice">Only accounts explicitly registered as active Super Admins can enter this portal. Passwords are handled by Firebase Authentication.</div><a class="back" href="./index.html">← Back to ChannelMed preview</a></section><div class="foot">ChannelMed Manager · Secure administration</div></main>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const form=document.getElementById("loginForm"),btn=document.getElementById("submitBtn"),errorBox=document.getElementById("errorBox");
 form.addEventListener("submit",async e=>{e.preventDefault();errorBox.style.display="none";btn.disabled=true;btn.textContent="Checking access…";
-try{const credential=await signInWithEmailAndPassword(auth,document.getElementById("email").value.trim(),document.getElementById("password").value);const adminSnap=await getDoc(doc(db,"platformAdmins",credential.user.uid));if(!adminSnap.exists()||adminSnap.data().active!==true||adminSnap.data().role!=="superAdmin"){await auth.signOut();throw new Error("This account is not authorised as an active Super Admin. Please contact the platform owner.");}location.href="./super-admin.html";}
+try{const credential=await signInWithEmailAndPassword(auth,document.getElementById("email").value.trim(),document.getElementById("password").value);const adminSnap=await getDoc(doc(db,"platformAdmins",credential.user.uid));if(!adminSnap.exists()||adminSnap.data().active!==true||adminSnap.data().role!=="superAdmin"){await signOut(auth);throw new Error("This account is not authorised as an active Super Admin. Please contact the platform owner.");}location.href="./super-admin.html";}
 catch(err){let message=err.code==="auth/invalid-credential"?"Email or password is incorrect.":err.code==="auth/too-many-requests"?"Too many attempts. Please try again later.":err.code==="auth/network-request-failed"?"Network error. Check your internet connection.":err.message||"Unable to sign in.";errorBox.textContent=message;errorBox.style.display="block";btn.disabled=false;btn.textContent="Sign in securely";}});
 </script></body></html>
