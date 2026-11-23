@@ -32,7 +32,7 @@
 <div class="sidebottom">ChannelMed Manager · Preview v1.0<br>Smart pharmacy operations</div>
 </aside>
 <main class="main">
-<header class="topbar"><div class="crumb">Workspace&nbsp; / &nbsp;<strong id="crumb">Overview</strong></div><div class="topright"><select id="branchSelect" style="border:1px solid #dce8e7;border-radius:20px;padding:7px 10px;color:var(--teal);background:#f0faf8;font-size:11px"><option>Main Branch</option><option>Branch 02</option></select><a href="./admin-login.html" style="text-decoration:none;border:1px solid #dce8e7;border-radius:20px;padding:7px 11px;color:var(--teal);background:#fff;font-size:11px;font-weight:700">Super Admin Login ↗</a><span class="pill">● Demo mode</span><div class="avatar">P</div></div></header>
+<header class="topbar"><div class="crumb">Workspace&nbsp; / &nbsp;<strong id="crumb">Overview</strong></div><div class="topright"><select id="branchSelect" style="border:1px solid #dce8e7;border-radius:20px;padding:7px 10px;color:var(--teal);background:#f0faf8;font-size:11px"><option>Main Branch</option><option>Branch 02</option></select><button id="openLogin" style="border:1px solid #dce8e7;border-radius:20px;padding:7px 13px;color:var(--teal);background:#fff;font-size:11px;font-weight:700;cursor:pointer">Login / Sign in</button><span class="pill">● Demo mode</span><div class="avatar">P</div></div></header>
 <div class="demo-banner" role="note" aria-label="Demo version notice"><div><strong>ONLY DEMO</strong><span>ChannelMed Manager preview — sample information only.</span></div><div class="demo-warning">NOT A LIVE PHARMACY SYSTEM<br>Do not enter real customer or medicine data.</div></div>
 <div class="content">
 <section class="page active" id="overview">
@@ -72,6 +72,18 @@
 <section class="page" id="staff"><div class="welcome"><div><h1>Staff & Users</h1><p>Manage pharmacy employees and access permissions.</p></div><button class="primary" onclick="notify('Staff invitation will be added after account setup.')">＋ Invite Staff</button></div><div class="panel"><div class="empty">♧<h2>Team access</h2>Owner, pharmacist and cashier roles with separate permissions will be added.</div></div></section>
 <section class="page" id="settings"><div class="welcome"><div><h1>Settings</h1><p>Configure your pharmacy profile and preferences.</p></div></div><div class="panel"><h2>Pharmacy profile</h2><p class="subtle">Pharmacy name, address, contact details, invoice settings and user permissions will be configured here.</p></div></section>
 </div></main></div><div class="toast" id="toast"></div>
+<div id="loginLayer" style="display:none;position:fixed;inset:0;background:#102d3acc;z-index:20;place-items:center;padding:18px">
+ <section style="width:min(420px,100%);background:#fff;border-radius:18px;padding:26px;box-shadow:0 20px 60px #0003">
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:20px;color:#0f766e">✚ ChannelMed Manager</b><div style="font-size:11px;color:#718096">ONE LOGIN FOR ALL USERS</div></div><button id="closeLogin" aria-label="Close" style="border:0;background:#eef4f4;border-radius:50%;width:32px;height:32px;font-size:18px">×</button></div>
+  <h2 style="margin:22px 0 5px">Sign in</h2><p style="margin:0 0 18px;color:#718096;font-size:12px">Enter your registered email and password. Your account role determines which workspace you can access.</p>
+  <form id="unifiedLogin"><label style="display:block;font-size:12px;font-weight:700;margin:12px 0 6px">Email</label><input id="loginEmail" type="email" required autocomplete="username" style="width:100%;padding:12px;border:1px solid #dce6e9;border-radius:9px">
+  <label style="display:block;font-size:12px;font-weight:700;margin:12px 0 6px">Password</label><input id="loginPassword" type="password" required autocomplete="current-password" style="width:100%;padding:12px;border:1px solid #dce6e9;border-radius:9px">
+  <button id="unifiedLoginBtn" type="submit" style="width:100%;padding:12px;margin-top:18px;border:0;border-radius:9px;background:#0f766e;color:#fff;font-weight:800">Sign in</button></form>
+  <button id="forgotPassword" style="display:block;margin:13px auto 0;border:0;background:none;color:#0f766e;font-size:12px;font-weight:700">Forgot password?</button>
+  <div id="loginMessage" role="status" style="display:none;margin-top:14px;padding:11px;border-radius:9px;background:#fff3ed;color:#9b4a25;font-size:12px"></div>
+  <div style="margin-top:16px;color:#84939a;font-size:10px;text-align:center">New pharmacy registrations and staff invitations will be enabled with the account setup workflow.</div>
+ </section>
+</div>
 <script>
 const cmKey='channelmed-branch-demo';
 let cmData=JSON.parse(localStorage.getItem(cmKey)||'null')||{branches:[{name:'Main Branch',location:'Colombo'},{name:'Branch 02',location:'Kandy'}]};
@@ -88,5 +100,25 @@ document.getElementById('nav').addEventListener('click',e=>{let b=e.target.close
 document.addEventListener('click',e=>{let b=e.target.closest('[data-goto]');if(b)showPage(b.dataset.goto)});
 function notify(t){let el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display='none',2800)}
 function filterRows(input,id){let q=input.value.toLowerCase();document.querySelectorAll('#'+id+' tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none')}
+</script>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,sendPasswordResetEmail,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
+const authApp=initializeApp(firebaseConfig),auth=getAuth(authApp),db=getFirestore(authApp);
+const layer=document.getElementById("loginLayer"),msg=document.getElementById("loginMessage"),loginBtn=document.getElementById("unifiedLoginBtn");
+document.getElementById("openLogin").addEventListener("click",()=>{layer.style.display="grid";});
+document.getElementById("closeLogin").addEventListener("click",()=>{layer.style.display="none";});
+layer.addEventListener("click",e=>{if(e.target===layer)layer.style.display="none";});
+function showLoginMessage(t,ok=false){msg.textContent=t;msg.style.display="block";msg.style.background=ok?"#eff8f6":"#fff3ed";msg.style.color=ok?"#256b55":"#9b4a25";}
+document.getElementById("unifiedLogin").addEventListener("submit",async e=>{e.preventDefault();msg.style.display="none";loginBtn.disabled=true;loginBtn.textContent="Checking account…";
+try{const cred=await signInWithEmailAndPassword(auth,document.getElementById("loginEmail").value.trim(),document.getElementById("loginPassword").value);const admin=await getDoc(doc(db,"platformAdmins",cred.user.uid));
+if(admin.exists()&&admin.data().active===true&&admin.data().role==="superAdmin"){location.href="./super-admin.html";return;}
+await signOut(auth);showLoginMessage("Login details are valid, but this account does not yet have an activated workspace role. Pharmacy Owner and Staff role workspaces will be enabled after the secure account and branch permissions are configured.");
+}catch(err){const m=err.code==="auth/invalid-credential"?"Email or password is incorrect.":err.code==="auth/too-many-requests"?"Too many attempts. Please try again later.":err.code==="auth/network-request-failed"?"Network error. Check your connection.":err.message||"Unable to sign in.";showLoginMessage(m);}
+finally{loginBtn.disabled=false;loginBtn.textContent="Sign in";}});
+document.getElementById("forgotPassword").addEventListener("click",async()=>{const email=document.getElementById("loginEmail").value.trim();if(!email){showLoginMessage("Enter your email address first.");return;}try{await sendPasswordResetEmail(auth,email);showLoginMessage("Password reset email sent. Check your inbox.",true);}catch(err){showLoginMessage(err.code==="auth/user-not-found"?"No account found for this email.":err.message||"Could not send reset email.");}});
 </script>
 </body></html>
