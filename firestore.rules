@@ -8,13 +8,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.role == "superAdmin";
     }
 
-    // Admin registry records are provisioned manually or by trusted server code.
+    function isPharmacyMember(pharmacyId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.pharmacyId == pharmacyId;
+    }
+
     match /platformAdmins/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, create, update, delete: if false;
     }
 
-    // Pharmacy owners may submit one application tied to their own Auth UID.
     match /pharmacyApplications/{uid} {
       allow create: if request.auth != null
         && request.auth.uid == uid
@@ -37,13 +42,28 @@ service cloud.firestore {
         && request.resource.data.planId in ["monthly", "yearly"]
         && request.resource.data.createdAt == request.time
         && request.resource.data.keys().hasOnly(["ownerUid", "pharmacyName", "ownerName", "phone", "address", "email", "planId", "status", "createdAt"]);
-      allow get: if (request.auth != null && request.auth.uid == uid)
-        || isActiveSuperAdmin();
+      allow get: if (request.auth != null && request.auth.uid == uid) || isActiveSuperAdmin();
       allow list: if isActiveSuperAdmin();
       allow update, delete: if isActiveSuperAdmin();
     }
 
-    // Super Admin controlled platform configuration.
+    match /userProfiles/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update, delete: if isActiveSuperAdmin();
+    }
+
+    match /pharmacies/{pharmacyId} {
+      allow get: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
+      allow list: if isActiveSuperAdmin();
+      allow create, update, delete: if isActiveSuperAdmin();
+
+      match /branches/{branchId} {
+        allow get, list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
+        allow create, update, delete: if isActiveSuperAdmin();
+      }
+    }
+
     match /platformConfig/{configId} {
       allow get, list, create, update: if isActiveSuperAdmin();
       allow delete: if false;
@@ -59,7 +79,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Deny every other collection until its tenant-safe workflow is implemented.
+    // Operational pharmacy collections remain denied until their role and branch rules are implemented.
     match /{document=**} {
       allow read, write: if false;
     }
