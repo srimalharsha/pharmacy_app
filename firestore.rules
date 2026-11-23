@@ -40,6 +40,7 @@ service cloud.firestore {
     signedIn() && request.auth.uid == uid
     && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","invitationId","createdAt"])
     && request.resource.data.email == request.auth.token.email
+    && request.resource.data.createdAt == request.time
     && validStaffRole(request.resource.data.role) && request.resource.data.active == true
     && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
     && exists(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId))
@@ -54,6 +55,7 @@ service cloud.firestore {
     && isPharmacyOwner(resource.data.pharmacyId)
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["active","role","branchId"])
     && validStaffRole(request.resource.data.role)
+    && request.resource.data.active is bool
     && exists(/databases/$(database)/documents/pharmacies/$(resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
    );
    allow delete: if isActiveSuperAdmin();
