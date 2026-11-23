@@ -29,6 +29,7 @@ main{max-width:1160px;margin:0 auto;padding:30px 22px}.welcome{display:flex;just
 <div class="card"><div class="label">Subscription plan</div><div class="big" id="planName">—</div><div class="muted" id="planStatus">Plan assigned to this pharmacy</div></div>
 <div class="card full"><h2>Branches</h2><div id="branchList" class="muted">Loading branch information…</div></div>
 </section>
+<section class="card" style="margin:18px 0"><h2>Staff & Users</h2><p class="muted">Invite employees using their existing email address. Each staff member is assigned to one branch.</p><form id="staffInviteForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"><input id="staffName" required maxlength="100" placeholder="Staff full name" style="padding:11px;border:1px solid var(--line);border-radius:8px"><input id="staffEmail" required type="email" placeholder="Existing email address" style="padding:11px;border:1px solid var(--line);border-radius:8px"><input id="staffPhone" maxlength="20" placeholder="Phone (optional)" style="padding:11px;border:1px solid var(--line);border-radius:8px"><select id="staffRole" required style="padding:11px;border:1px solid var(--line);border-radius:8px"><option value="pharmacist">Pharmacist</option><option value="cashier">Cashier</option><option value="branchManager">Branch Manager</option></select><select id="staffBranch" required style="padding:11px;border:1px solid var(--line);border-radius:8px"><option value="">Select branch</option></select><button type="submit" id="sendStaffInvite" style="background:var(--teal);color:#fff;border:0;border-radius:8px;padding:11px;font-weight:750">Send Invitation</button></form><div id="staffMessage" class="muted" style="margin:12px 0"></div><div id="staffList" class="muted">Loading staff…</div></section>
 <div class="notice"><b>Workspace setup stage:</b> Your Owner account is connected to its Pharmacy Account. The stock, billing, purchasing and customer modules are not enabled for live transactions yet. This page will not show invented demo figures or accept real pharmacy transactions.</div>
 <section class="card"><h2>Pharmacy management modules</h2><div class="modules">
 <div class="module"><b>▤ Medicine Stock</b><span class="soon">Setup pending</span></div>
@@ -43,11 +44,11 @@ main{max-width:1160px;margin:0 auto;padding:30px 22px}.welcome{display:flex;just
 </main>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,doc,getDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getAuth,onAuthStateChanged,signOut,sendSignInLinkToEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,getDoc,collection,getDocs,query,where,setDoc,updateDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const config={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
 const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
-const errorBox=document.getElementById("error");
+const errorBox=document.getElementById("error");let ownerProfile=null,ownerPharmacyId=null,ownerBranches=[];const staffMessage=document.getElementById("staffMessage");function staffNote(t,ok=false){staffMessage.textContent=t;staffMessage.style.color=ok?"#23765d":"#93462e";}
 function fail(message){errorBox.textContent=message;errorBox.style.display="block";}
 document.getElementById("logout").addEventListener("click",async()=>{await signOut(auth);location.href="./index.html";});
 onAuthStateChanged(auth,async user=>{
@@ -56,7 +57,7 @@ onAuthStateChanged(auth,async user=>{
  try{
   const p=await getDoc(doc(db,"userProfiles",user.uid));
   if(!p.exists()){await signOut(auth);location.href="./index.html";return;}
-  const profile=p.data();
+  const profile=p.data();ownerProfile=profile;ownerPharmacyId=profile.pharmacyId;
   if(profile.active!==true||profile.role!=="owner"||!profile.pharmacyId){await signOut(auth);location.href="./index.html";return;}
   const pharmacySnap=await getDoc(doc(db,"pharmacies",profile.pharmacyId));
   if(!pharmacySnap.exists()){fail("Your Pharmacy Account record was not found. Please contact the ChannelMed Super Admin.");return;}
@@ -70,9 +71,47 @@ onAuthStateChanged(auth,async user=>{
   document.getElementById("planName").textContent=plan==="monthly"?"Monthly":plan==="yearly"?"Yearly":plan||"Not assigned";
   document.getElementById("planStatus").textContent=pharmacy.subscriptionStatus||"Subscription information";
   const branches=await getDocs(collection(db,"pharmacies",profile.pharmacyId,"branches"));
-  const list=document.getElementById("branchList");list.innerHTML="";
+  const list=document.getElementById("branchList");list.innerHTML="";ownerBranches=[];
   if(branches.empty){list.textContent="No branches have been created yet.";}
-  else branches.forEach(item=>{const b=item.data();const row=document.createElement("div");row.className="branch";const left=document.createElement("div");const name=document.createElement("b");name.textContent=b.name||"Branch";const detail=document.createElement("div");detail.className="muted";detail.textContent=[b.code,b.address].filter(Boolean).join(" · ")||"Branch details not added";left.append(name,detail);const status=document.createElement("span");status.className="pill";status.textContent=b.active===false?"Inactive":"Active";row.append(left,status);list.append(row);});
+  else branches.forEach(item=>{const b=item.data();ownerBranches.push({id:item.id,...b});const row=document.createElement("div");row.className="branch";const left=document.createElement("div");const name=document.createElement("b");name.textContent=b.name||"Branch";const detail=document.createElement("div");detail.className="muted";detail.textContent=[b.code,b.address].filter(Boolean).join(" · ")||"Branch details not added";left.append(name,detail);const status=document.createElement("span");status.className="pill";status.textContent=b.active===false?"Inactive":"Active";row.append(left,status);list.append(row);});
+  const branchSelect=document.getElementById("staffBranch");ownerBranches.forEach(b=>{const opt=document.createElement("option");opt.value=b.id;opt.textContent=b.name||b.id;branchSelect.append(opt);});
+  await loadStaff();
  }catch(err){console.error(err);fail("Could not load your pharmacy workspace ("+(err.code||"error")+"). Check that the latest Firestore Rules are published, then sign in again.");}
+});
+
+async function loadStaff(){
+ const box=document.getElementById("staffList");box.textContent="Loading staff…";
+ try{
+  const q=query(collection(db,"userProfiles"),where("pharmacyId","==",ownerPharmacyId));
+  const snap=await getDocs(q);box.innerHTML="";
+  const members=snap.docs.filter(d=>d.id!==auth.currentUser.uid);
+  if(!members.length){box.textContent="No staff accounts yet. Send an invitation above." ;return;}
+  members.forEach(d=>{
+   const s=d.data(),row=document.createElement("div");row.className="branch";row.style.gap="12px";
+   const info=document.createElement("div"),name=document.createElement("b");name.textContent=s.displayName||s.email||"Staff member";
+   const detail=document.createElement("div");detail.className="muted";const branch=ownerBranches.find(b=>b.id===s.branchId);
+   detail.textContent=(s.email||"")+" · "+(s.role||"staff")+" · "+(branch?.name||"No branch assigned");
+   info.append(name,detail);const controls=document.createElement("div");controls.style.display="flex";controls.style.gap="6px";controls.style.flexWrap="wrap";
+   const role=document.createElement("select");["branchManager","pharmacist","cashier"].forEach(v=>{const x=document.createElement("option");x.value=v;x.textContent=v;role.append(x)});role.value=["branchManager","pharmacist","cashier"].includes(s.role)?s.role:"cashier";
+   const branchSel=document.createElement("select");ownerBranches.forEach(b=>{const x=document.createElement("option");x.value=b.id;x.textContent=b.name||b.id;branchSel.append(x)});branchSel.value=s.branchId||"";
+   const save=document.createElement("button");save.textContent="Save";save.addEventListener("click",async()=>{try{await updateDoc(doc(db,"userProfiles",d.id),{role:role.value,branchId:branchSel.value});staffNote("Staff role and branch updated.",true)}catch(e){staffNote("Could not update staff: "+(e.code||e.message))}});
+   const toggle=document.createElement("button");toggle.textContent=s.active===true?"Disable":"Activate";toggle.addEventListener("click",async()=>{try{await updateDoc(doc(db,"userProfiles",d.id),{active:!(s.active===true)});staffNote("Staff access status updated.",true);await loadStaff()}catch(e){staffNote("Could not change staff status: "+(e.code||e.message))}});
+   controls.append(role,branchSel,save,toggle);row.append(info,controls);box.append(row);
+  });
+ }catch(e){box.textContent="Could not load staff list ("+(e.code||e.message)+"). Check Firestore Rules.";}
+}
+document.getElementById("staffInviteForm").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=document.getElementById("sendStaffInvite");btn.disabled=true;btn.textContent="Sending…";
+ const name=document.getElementById("staffName").value.trim(),email=document.getElementById("staffEmail").value.trim(),phone=document.getElementById("staffPhone").value.trim(),role=document.getElementById("staffRole").value,branchId=document.getElementById("staffBranch").value;
+ try{
+  if(!branchId||!ownerBranches.some(b=>b.id===branchId))throw new Error("Please select a valid branch.");
+  if(email.toLowerCase()===String(auth.currentUser.email||"").toLowerCase())throw new Error("Owner email cannot be invited as staff.");
+  const invitationRef=doc(collection(db,"staffInvitations"));
+  await setDoc(invitationRef,{email,name,phone,role,branchId,pharmacyId:ownerPharmacyId,status:"pending",createdBy:auth.currentUser.uid,createdAt:serverTimestamp()});
+  const actionCodeSettings={url:"https://srimalharsha.github.io/pharmacy_app/staff-setup.html?invite="+invitationRef.id,handleCodeInApp:true};
+  await sendSignInLinkToEmail(auth,email,actionCodeSettings);
+  staffNote("Invitation email sent to "+email+". The employee must open the link and set their password.",true);document.getElementById("staffInviteForm").reset();await loadStaff();
+ }catch(err){staffNote("Invitation could not be sent: "+(err.code||err.message));}
+ finally{btn.disabled=false;btn.textContent="Send Invitation";}
 });
 </script></body></html>
