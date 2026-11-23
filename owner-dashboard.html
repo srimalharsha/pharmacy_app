@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102d3a">
+<title>Owner Workspace | ChannelMed Manager</title>
+<style>
+:root{--navy:#102d3a;--teal:#0f766e;--bg:#f3f7f8;--ink:#1b3440;--muted:#71838b;--line:#e3ebee;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.5 Inter,system-ui,sans-serif;color:var(--ink)}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 26px}
+.brand{font-size:18px;font-weight:850;color:var(--navy)}.brand small{display:block;font-size:9px;letter-spacing:1.8px;color:var(--muted)}
+.actions{display:flex;gap:10px;align-items:center}button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 13px;cursor:pointer;color:var(--ink);font-weight:650}
+main{max-width:1160px;margin:0 auto;padding:30px 22px}.welcome{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:22px}.welcome h1{font-size:27px;margin:0 0 5px}.muted{color:var(--muted)}.pill{display:inline-flex;padding:6px 10px;border-radius:30px;background:#e7f6f1;color:#23765d;font-size:12px;font-weight:750}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:19px;box-shadow:0 5px 20px #173d4b08}.card h2{font-size:15px;margin:0 0 12px}.big{font-size:21px;font-weight:800;margin:5px 0}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.full{grid-column:1/-1}.branch{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-top:1px solid var(--line)}.branch:first-of-type{border-top:0}
+.modules{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.module{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfdfd}.module b{display:block;margin-bottom:4px}.soon{font-size:11px;color:#98713b}
+.notice{background:#fff8e9;border:1px solid #f0dfb7;color:#765a24;border-radius:12px;padding:14px 16px;margin:18px 0}
+#error{display:none;background:#fff0ed;color:#93462e;padding:14px;border-radius:10px;margin:20px 0}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.modules{grid-template-columns:repeat(2,minmax(0,1fr))}.welcome{display:block}header{padding:0 15px}main{padding:22px 14px}}
+</style></head>
+<body>
+<header><div class="brand">✚ ChannelMed <small>PHARMACY MANAGER · OWNER WORKSPACE</small></div><div class="actions"><span id="userEmail" class="muted"></span><button id="logout">Sign out</button></div></header>
+<main>
+<div class="welcome"><div><h1 id="greeting">Your Pharmacy Workspace</h1><div class="muted">Manage your pharmacy account and branches from one place.</div></div><span class="pill">● Owner Account</span></div>
+<div id="error"></div>
+<section class="grid">
+<div class="card"><div class="label">Pharmacy account</div><div class="big" id="pharmacyName">Loading…</div><div class="muted" id="pharmacyAddress">Checking account details</div></div>
+<div class="card"><div class="label">Account status</div><div class="big" id="accountStatus">Checking…</div><div class="muted">Controlled by ChannelMed platform</div></div>
+<div class="card"><div class="label">Subscription plan</div><div class="big" id="planName">—</div><div class="muted" id="planStatus">Plan assigned to this pharmacy</div></div>
+<div class="card full"><h2>Branches</h2><div id="branchList" class="muted">Loading branch information…</div></div>
+</section>
+<div class="notice"><b>Workspace setup stage:</b> Your Owner account is connected to its Pharmacy Account. The stock, billing, purchasing and customer modules are not enabled for live transactions yet. This page will not show invented demo figures or accept real pharmacy transactions.</div>
+<section class="card"><h2>Pharmacy management modules</h2><div class="modules">
+<div class="module"><b>▤ Medicine Stock</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>▣ Billing & Sales</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>♧ Suppliers</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>♙ Customers</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>▥ Reports</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>⚑ Expiry & Alerts</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>♧ Staff & Users</b><span class="soon">Setup pending</span></div>
+<div class="module"><b>⚙ Settings</b><span class="soon">Setup pending</span></div>
+</div></section>
+</main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,getDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const config={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
+const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
+const errorBox=document.getElementById("error");
+function fail(message){errorBox.textContent=message;errorBox.style.display="block";}
+document.getElementById("logout").addEventListener("click",async()=>{await signOut(auth);location.href="./index.html";});
+onAuthStateChanged(auth,async user=>{
+ if(!user){location.href="./index.html";return;}
+ document.getElementById("userEmail").textContent=user.email||"";
+ try{
+  const p=await getDoc(doc(db,"userProfiles",user.uid));
+  if(!p.exists()){await signOut(auth);location.href="./index.html";return;}
+  const profile=p.data();
+  if(profile.active!==true||profile.role!=="owner"||!profile.pharmacyId){await signOut(auth);location.href="./index.html";return;}
+  const pharmacySnap=await getDoc(doc(db,"pharmacies",profile.pharmacyId));
+  if(!pharmacySnap.exists()){fail("Your Pharmacy Account record was not found. Please contact the ChannelMed Super Admin.");return;}
+  const pharmacy=pharmacySnap.data();
+  if(pharmacy.status!=="active"){fail("This Pharmacy Account is not currently active. Please contact the ChannelMed Super Admin.");return;}
+  document.getElementById("greeting").textContent="Welcome, "+(profile.displayName||"Pharmacy Owner");
+  document.getElementById("pharmacyName").textContent=pharmacy.name||pharmacy.pharmacyName||"Your Pharmacy";
+  document.getElementById("pharmacyAddress").textContent=pharmacy.address||"Address not added";
+  document.getElementById("accountStatus").textContent="Active";
+  const plan=pharmacy.planId||pharmacy.subscriptionPlan||"";
+  document.getElementById("planName").textContent=plan==="monthly"?"Monthly":plan==="yearly"?"Yearly":plan||"Not assigned";
+  document.getElementById("planStatus").textContent=pharmacy.subscriptionStatus||"Subscription information";
+  const branches=await getDocs(collection(db,"pharmacies",profile.pharmacyId,"branches"));
+  const list=document.getElementById("branchList");list.innerHTML="";
+  if(branches.empty){list.textContent="No branches have been created yet.";}
+  else branches.forEach(item=>{const b=item.data();const row=document.createElement("div");row.className="branch";const left=document.createElement("div");const name=document.createElement("b");name.textContent=b.name||"Branch";const detail=document.createElement("div");detail.className="muted";detail.textContent=[b.code,b.address].filter(Boolean).join(" · ")||"Branch details not added";left.append(name,detail);const status=document.createElement("span");status.className="pill";status.textContent=b.active===false?"Inactive":"Active";row.append(left,status);list.append(row);});
+ }catch(err){console.error(err);fail("Could not load your pharmacy workspace ("+(err.code||"error")+"). Check that the latest Firestore Rules are published, then sign in again.");}
+});
+</script></body></html>
