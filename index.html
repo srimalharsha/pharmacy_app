@@ -137,7 +137,7 @@ try{
  const admin=await getDoc(doc(db,"platformAdmins",cred.user.uid));
  if(admin.exists()&&admin.data().active===true&&admin.data().role==="superAdmin"){location.href="./super-admin.html";return;}
  const profile=await getDoc(doc(db,"userProfiles",cred.user.uid));
- if(profile.exists()&&profile.data().active===true&&["branchManager","staff"].includes(profile.data().role)){location.href="./staff-dashboard.html";return;}
+ if(profile.exists()&&profile.data().active===true&&profile.data().role==="staff"){location.href="./staff-dashboard.html";return;}
  if(profile.exists()&&profile.data().active===true&&profile.data().role==="owner"){
   const profileData=profile.data();
   const pharmacy=await getDoc(doc(db,"pharmacies",profileData.pharmacyId));
