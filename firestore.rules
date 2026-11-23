@@ -65,7 +65,7 @@ service cloud.firestore {
     && request.resource.data.createdBy == request.auth.uid
     && request.resource.data.pharmacyId is string && isPharmacyOwner(request.resource.data.pharmacyId)
     && request.resource.data.email is string && request.resource.data.name is string
-    && request.resource.data.role in ["branchManager","pharmacist","cashier"]
+    && request.resource.data.role in ["branchManager","staff"]
     && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
     && request.resource.data.keys().hasOnly(["email","name","phone","role","branchId","pharmacyId","status","createdBy","createdAt"]);
    allow get: if isActiveSuperAdmin() || (signedIn() && resource.data.email == request.auth.token.email);
