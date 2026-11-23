@@ -1,87 +1,89 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function isActiveSuperAdmin() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.active == true
-        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.role == "superAdmin";
-    }
-
-    function isPharmacyMember(pharmacyId) {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid))
-        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.active == true
-        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.pharmacyId == pharmacyId;
-    }
-
-    match /platformAdmins/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      allow list, create, update, delete: if false;
-    }
-
-    match /pharmacyApplications/{uid} {
-      allow create: if request.auth != null
-        && request.auth.uid == uid
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.status == "pending"
-        && request.resource.data.pharmacyName is string
-        && request.resource.data.pharmacyName.size() >= 2
-        && request.resource.data.pharmacyName.size() <= 120
-        && request.resource.data.ownerName is string
-        && request.resource.data.ownerName.size() >= 2
-        && request.resource.data.ownerName.size() <= 100
-        && request.resource.data.phone is string
-        && request.resource.data.phone.size() >= 7
-        && request.resource.data.phone.size() <= 20
-        && request.resource.data.address is string
-        && request.resource.data.address.size() >= 5
-        && request.resource.data.address.size() <= 300
-        && request.resource.data.email is string
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.planId in ["monthly", "yearly"]
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.keys().hasOnly(["ownerUid", "pharmacyName", "ownerName", "phone", "address", "email", "planId", "status", "createdAt"]);
-      allow get: if (request.auth != null && request.auth.uid == uid) || isActiveSuperAdmin();
-      allow list: if isActiveSuperAdmin();
-      allow update, delete: if isActiveSuperAdmin();
-    }
-
-    match /userProfiles/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      allow list: if false;
-      allow create, update, delete: if isActiveSuperAdmin();
-    }
-
-    match /pharmacies/{pharmacyId} {
-      allow get: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
-      allow list: if isActiveSuperAdmin();
-      allow create, update, delete: if isActiveSuperAdmin();
-
-      match /branches/{branchId} {
-        allow get, list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
-        allow create, update, delete: if isActiveSuperAdmin();
-      }
-    }
-
-    match /platformConfig/{configId} {
-      allow get, list, create, update: if isActiveSuperAdmin();
-      allow delete: if false;
-    }
-    match /subscriptionPlans/{planId} {
-      allow get, list, create, update: if isActiveSuperAdmin();
-      allow delete: if false;
-    }
-    match /platformAuditLogs/{logId} {
-      allow create: if isActiveSuperAdmin()
-        && request.resource.data.adminUid == request.auth.uid;
-      allow get, list: if isActiveSuperAdmin();
-      allow update, delete: if false;
-    }
-
-    // Operational pharmacy collections remain denied until their role and branch rules are implemented.
-    match /{document=**} {
-      allow read, write: if false;
-    }
+ match /databases/{database}/documents {
+  function signedIn(){return request.auth != null;}
+  function isActiveSuperAdmin(){
+   return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+    && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.active == true
+    && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.role == "superAdmin";
   }
+  function profile(){return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;}
+  function isPharmacyMember(pharmacyId){
+   return signedIn() && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid))
+    && profile().active == true && profile().pharmacyId == pharmacyId;
+  }
+  function isPharmacyOwner(pharmacyId){return isPharmacyMember(pharmacyId) && profile().role == "owner";}
+  function validStaffRole(role){return role in ["branchManager","pharmacist","cashier"];}
+  match /platformAdmins/{uid}{
+   allow get: if signedIn() && request.auth.uid == uid;
+   allow list,create,update,delete: if false;
+  }
+  match /pharmacyApplications/{uid}{
+   allow create: if signedIn() && request.auth.uid == uid && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.status == "pending" && request.resource.data.pharmacyName is string
+    && request.resource.data.pharmacyName.size() >= 2 && request.resource.data.pharmacyName.size() <= 120
+    && request.resource.data.ownerName is string && request.resource.data.ownerName.size() >= 2
+    && request.resource.data.ownerName.size() <= 100 && request.resource.data.phone is string
+    && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 20
+    && request.resource.data.address is string && request.resource.data.address.size() >= 5
+    && request.resource.data.address.size() <= 300 && request.resource.data.email == request.auth.token.email
+    && request.resource.data.planId in ["monthly","yearly"] && request.resource.data.createdAt == request.time
+    && request.resource.data.keys().hasOnly(["ownerUid","pharmacyName","ownerName","phone","address","email","planId","status","createdAt"]);
+   allow get: if (signedIn() && request.auth.uid == uid) || isActiveSuperAdmin();
+   allow list: if isActiveSuperAdmin();
+   allow update,delete: if isActiveSuperAdmin();
+  }
+  match /userProfiles/{uid}{
+   allow get: if (signedIn() && request.auth.uid == uid) || (resource.data.pharmacyId is string && isPharmacyOwner(resource.data.pharmacyId));
+   allow list: if resource.data.pharmacyId is string && isPharmacyOwner(resource.data.pharmacyId);
+   allow create: if isActiveSuperAdmin() || (
+    signedIn() && request.auth.uid == uid
+    && request.resource.data.keys().hasOnly(["displayName","email","phone","role","pharmacyId","branchId","active","createdAt"])
+    && request.resource.data.email == request.auth.token.email
+    && validStaffRole(request.resource.data.role) && request.resource.data.active == true
+    && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
+    && exists(/databases/$(database)/documents/staffInvitations/$(request.resource.data.invitationId))
+   );
+   allow update: if isActiveSuperAdmin() || (
+    resource.data.role != "owner" && resource.data.pharmacyId is string
+    && isPharmacyOwner(resource.data.pharmacyId)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["active","role","branchId"])
+    && validStaffRole(request.resource.data.role)
+    && exists(/databases/$(database)/documents/pharmacies/$(resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
+   );
+   allow delete: if isActiveSuperAdmin();
+  }
+  match /staffInvitations/{inviteId}{
+   allow create: if signedIn() && request.resource.data.status == "pending"
+    && request.resource.data.createdBy == request.auth.uid
+    && request.resource.data.pharmacyId is string && isPharmacyOwner(request.resource.data.pharmacyId)
+    && request.resource.data.email is string && request.resource.data.name is string
+    && request.resource.data.role in ["branchManager","pharmacist","cashier"]
+    && exists(/databases/$(database)/documents/pharmacies/$(request.resource.data.pharmacyId)/branches/$(request.resource.data.branchId))
+    && request.resource.data.keys().hasOnly(["email","name","phone","role","branchId","pharmacyId","status","createdBy","createdAt"]);
+   allow get: if isActiveSuperAdmin() || (signedIn() && resource.data.email == request.auth.token.email);
+   allow list: if signedIn() && isPharmacyOwner(resource.data.pharmacyId);
+   allow update: if isActiveSuperAdmin() || (signedIn()
+    && resource.data.email == request.auth.token.email && resource.data.status == "pending"
+    && request.resource.data.status == "accepted" && request.resource.data.acceptedUid == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","acceptedUid","acceptedAt"]));
+   allow delete: if isPharmacyOwner(resource.data.pharmacyId) || isActiveSuperAdmin();
+  }
+  match /pharmacies/{pharmacyId}{
+   allow get: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
+   allow list: if isActiveSuperAdmin();
+   allow create,update,delete: if isActiveSuperAdmin();
+   match /branches/{branchId}{
+    allow get,list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
+    allow create,update,delete: if isActiveSuperAdmin();
+   }
+  }
+  match /platformConfig/{configId}{allow get,list,create,update: if isActiveSuperAdmin();allow delete: if false;}
+  match /subscriptionPlans/{planId}{allow get,list,create,update: if isActiveSuperAdmin();allow delete: if false;}
+  match /platformAuditLogs/{logId}{
+   allow create: if isActiveSuperAdmin() && request.resource.data.adminUid == request.auth.uid;
+   allow get,list: if isActiveSuperAdmin();allow update,delete: if false;
+  }
+  match /{document=**}{allow read,write: if false;}
+ }
 }
