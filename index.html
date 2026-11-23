@@ -141,8 +141,7 @@ try{
   const profileData=profile.data();
   const pharmacy=await getDoc(doc(db,"pharmacies",profileData.pharmacyId));
   if(pharmacy.exists()&&pharmacy.data().status==="active"){
-   layer.style.display="none";
-   alert("Owner workspace linked successfully. This website is still a DEMO preview; do not enter real pharmacy data yet.");
+   location.href="./owner-dashboard.html";
    return;
   }
  }
