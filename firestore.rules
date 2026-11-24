@@ -14,6 +14,32 @@ service cloud.firestore {
   }
   function isPharmacyOwner(pharmacyId){return isPharmacyMember(pharmacyId) && profile().role == "owner";}
   function validStaffRole(role){return role == "staff";}
+  function canManageInventory(pharmacyId, branchId, action){
+   return isPharmacyOwner(pharmacyId) || (
+    isPharmacyMember(pharmacyId) && profile().role == "staff"
+    && profile().branchId == branchId
+    && profile().permissions is map
+    && profile().permissions.inventory is map
+    && profile().permissions.inventory[action] == true
+   );
+  }
+  function validInventory(data){
+   return data.keys().hasAll(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
+    && data.keys().hasOnly(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
+    && data.medicineName is string && data.medicineName.size() >= 1 && data.medicineName.size() <= 120
+    && data.genericName is string && data.genericName.size() <= 120
+    && data.strength is string && data.strength.size() <= 60
+    && data.dosageForm is string && data.dosageForm.size() <= 40
+    && data.barcode is string && data.barcode.size() <= 80
+    && data.batchNumber is string && data.batchNumber.size() >= 1 && data.batchNumber.size() <= 80
+    && data.purchasePrice is number && data.purchasePrice >= 0
+    && data.sellingPrice is number && data.sellingPrice >= 0
+    && data.quantity is number && data.quantity >= 0
+    && data.reorderLevel is number && data.reorderLevel >= 0
+    && data.expiryDate is string && data.expiryDate.size() == 10
+    && data.createdBy is string && data.updatedBy is string
+    && data.createdAt is timestamp && data.updatedAt is timestamp;
+  }
   match /platformAdmins/{uid}{
    allow get: if signedIn() && request.auth.uid == uid;
    allow list,create,update,delete: if false;
@@ -85,6 +111,22 @@ service cloud.firestore {
    match /branches/{branchId}{
     allow get,list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
     allow create,update,delete: if isActiveSuperAdmin();
+    match /inventory/{itemId}{
+     allow get,list: if canManageInventory(pharmacyId,branchId,"view");
+     allow create: if canManageInventory(pharmacyId,branchId,"add")
+      && validInventory(request.resource.data)
+      && request.resource.data.createdBy == request.auth.uid
+      && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.createdAt == request.time
+      && request.resource.data.updatedAt == request.time;
+     allow update: if canManageInventory(pharmacyId,branchId,"edit")
+      && validInventory(request.resource.data)
+      && request.resource.data.createdBy == resource.data.createdBy
+      && request.resource.data.createdAt == resource.data.createdAt
+      && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.updatedAt == request.time;
+     allow delete: if canManageInventory(pharmacyId,branchId,"delete");
+    }
    }
   }
   match /platformConfig/{configId}{allow get,list,create,update: if isActiveSuperAdmin();allow delete: if false;}
