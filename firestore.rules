@@ -173,6 +173,7 @@ service cloud.firestore {
       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastSaleId"])
       && request.resource.data.quantity is number && request.resource.data.quantity >= 0
       && request.resource.data.quantity < resource.data.quantity
+      && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
       && request.resource.data.lastSaleId is string
       && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId))
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId)).data.status == "completed"
@@ -182,6 +183,7 @@ service cloud.firestore {
       canManageBilling(pharmacyId,branchId,"void")
       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastVoidedSaleId"])
       && request.resource.data.quantity is number && request.resource.data.quantity > resource.data.quantity
+      && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
       && request.resource.data.lastVoidedSaleId is string
       && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId))
       && get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)).data.status == "completed"
