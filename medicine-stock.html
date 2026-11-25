@@ -21,10 +21,10 @@ main{max-width:1180px;margin:24px auto;padding:0 15px}.top{display:flex;justify-
 </main>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import{getAuth,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import{getFirestore,doc,getDoc,collection,getDocs,addDoc,updateDoc,deleteDoc,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const cfg={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95"};
-const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);let profile=null,pharmacyId="",branches=[],branchId="",editingId=null,items=[];
+const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);await setPersistence(auth,browserLocalPersistence);let profile=null,pharmacyId="",branches=[],branchId="",editingId=null,items=[];
 const el=id=>document.getElementById(id),msg=t=>el("message").textContent=t;
 const fields=["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate"];
 function allowed(action){return profile?.role==="owner"||(profile?.role==="staff"&&profile?.permissions?.inventory?.[action]===true)}
