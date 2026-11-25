@@ -117,13 +117,16 @@ function filterRows(input,id){let q=input.value.toLowerCase();document.querySele
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,signOut,setPersistence,browserLocalPersistence} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,doc,getDoc,setDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
 
 const authApp=initializeApp(firebaseConfig),auth=getAuth(authApp),db=getFirestore(authApp);
-onAuthStateChanged(auth,async user=>{
- if(!user)return;
+await setPersistence(auth,browserLocalPersistence);
+let sessionRedirectRunning=false;
+async function redirectSignedInUser(user){
+ if(!user||sessionRedirectRunning)return;
+ sessionRedirectRunning=true;
  try{
   const admin=await getDoc(doc(db,"platformAdmins",user.uid));
   if(admin.exists()&&admin.data().active===true&&admin.data().role==="superAdmin"){location.replace("./super-admin.html");return;}
@@ -136,7 +139,11 @@ onAuthStateChanged(auth,async user=>{
    if(pharmacy.exists()&&pharmacy.data().status==="active")location.replace("./owner-dashboard.html");
   }
  }catch(err){console.error("Session redirect check failed:",err);}
-});
+ finally{sessionRedirectRunning=false;}
+}
+onAuthStateChanged(auth,user=>{redirectSignedInUser(user);});
+window.addEventListener("pageshow",()=>{if(auth.currentUser)redirectSignedInUser(auth.currentUser);});
+window.addEventListener("popstate",()=>{if(auth.currentUser)redirectSignedInUser(auth.currentUser);});
 
 const layer=document.getElementById("loginLayer"),msg=document.getElementById("loginMessage"),loginBtn=document.getElementById("unifiedLoginBtn");
 const loginPanel=document.getElementById("loginPanel"),registerPanel=document.getElementById("registerPanel");
