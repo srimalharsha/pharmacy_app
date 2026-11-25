@@ -23,9 +23,18 @@ service cloud.firestore {
     && profile().permissions.inventory[action] == true
    );
   }
+  function canManageBilling(pharmacyId, branchId, action){
+   return isPharmacyOwner(pharmacyId) || (
+    isPharmacyMember(pharmacyId) && profile().role == "staff"
+    && profile().branchId == branchId
+    && profile().permissions is map
+    && profile().permissions.billing is map
+    && profile().permissions.billing[action] == true
+   );
+  }
   function validInventory(data){
    return data.keys().hasAll(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
-    && data.keys().hasOnly(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
+    && data.keys().hasOnly(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy","lastSaleId","lastVoidedSaleId"])
     && data.medicineName is string && data.medicineName.size() >= 1 && data.medicineName.size() <= 120
     && data.genericName is string && data.genericName.size() <= 120
     && data.strength is string && data.strength.size() <= 60
@@ -111,6 +120,39 @@ service cloud.firestore {
    match /branches/{branchId}{
     allow get,list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
     allow create,update,delete: if isActiveSuperAdmin();
+    match /sales/{saleId}{
+     allow get,list: if canManageBilling(pharmacyId,branchId,"view") || canManageBilling(pharmacyId,branchId,"void");
+     allow create: if canManageBilling(pharmacyId,branchId,"create")
+      && request.resource.data.pharmacyId == pharmacyId
+      && request.resource.data.branchId == branchId
+      && request.resource.data.createdBy == request.auth.uid
+      && request.resource.data.status == "completed"
+      && request.resource.data.billNumber is string
+      && request.resource.data.subtotal is number && request.resource.data.subtotal >= 0
+      && request.resource.data.discount is number && request.resource.data.discount >= 0
+      && (request.resource.data.discount == 0 || canManageBilling(pharmacyId,branchId,"discount"))
+      && request.resource.data.total is number && request.resource.data.total == request.resource.data.subtotal - request.resource.data.discount
+      && request.resource.data.items is list && request.resource.data.items.size() > 0
+      && request.resource.data.createdAt == request.time
+      && request.resource.data.keys().hasOnly(["billNumber","customerName","customerPhone","items","subtotal","discount","total","paymentMethod","status","createdBy","createdAt","pharmacyId","branchId"]);
+     allow update: if canManageBilling(pharmacyId,branchId,"void")
+      && resource.data.status == "completed"
+      && request.resource.data.status == "voided"
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","voidedAt","voidedBy"])
+      && request.resource.data.voidedBy == request.auth.uid
+      && request.resource.data.voidedAt == request.time;
+     allow delete: if false;
+     match /items/{itemId}{
+      allow get,list: if canManageBilling(pharmacyId,branchId,"view") || canManageBilling(pharmacyId,branchId,"void");
+      allow create: if canManageBilling(pharmacyId,branchId,"create")
+       && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(saleId))
+       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(saleId)).data.status == "completed"
+       && request.resource.data.inventoryId == itemId
+       && request.resource.data.quantity is number && request.resource.data.quantity > 0
+       && request.resource.data.keys().hasOnly(["inventoryId","quantity"]);
+      allow update,delete: if false;
+     }
+    }
     match /inventory/{itemId}{
      allow get,list: if canManageInventory(pharmacyId,branchId,"view");
      allow create: if canManageInventory(pharmacyId,branchId,"add")
@@ -119,12 +161,34 @@ service cloud.firestore {
       && request.resource.data.updatedBy == request.auth.uid
       && request.resource.data.createdAt == request.time
       && request.resource.data.updatedAt == request.time;
-     allow update: if canManageInventory(pharmacyId,branchId,"edit")
+     allow update: if (
+      canManageInventory(pharmacyId,branchId,"edit")
       && validInventory(request.resource.data)
       && request.resource.data.createdBy == resource.data.createdBy
       && request.resource.data.createdAt == resource.data.createdAt
       && request.resource.data.updatedBy == request.auth.uid
-      && request.resource.data.updatedAt == request.time;
+      && request.resource.data.updatedAt == request.time
+     ) || (
+      canManageBilling(pharmacyId,branchId,"create")
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastSaleId"])
+      && request.resource.data.quantity is number && request.resource.data.quantity >= 0
+      && request.resource.data.quantity < resource.data.quantity
+      && request.resource.data.lastSaleId is string
+      && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId))
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId)).data.status == "completed"
+      && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId)/items/$(itemId))
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastSaleId)/items/$(itemId)).data.quantity == resource.data.quantity - request.resource.data.quantity
+     ) || (
+      canManageBilling(pharmacyId,branchId,"void")
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastVoidedSaleId"])
+      && request.resource.data.quantity is number && request.resource.data.quantity > resource.data.quantity
+      && request.resource.data.lastVoidedSaleId is string
+      && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId))
+      && get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)).data.status == "completed"
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)).data.status == "voided"
+      && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId))
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId)).data.quantity == request.resource.data.quantity - resource.data.quantity
+     );
      allow delete: if canManageInventory(pharmacyId,branchId,"delete");
     }
    }
