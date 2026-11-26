@@ -51,7 +51,14 @@ service cloud.firestore {
   function transferApproved(pharmacyId,transferId){
    return existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId))
     && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.status == "approved"
-    && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.approvedBy == request.auth.uid;
+    && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.approvedBy == request.auth.uid
+    && (isPharmacyOwner(pharmacyId) || (
+     isPharmacyMember(pharmacyId) && profile().role == "staff"
+     && profile().permissions is map && profile().permissions.stockTransfers is map
+     && profile().permissions.stockTransfers.approve == true
+     && (profile().branchId == getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.fromBranchId
+      || profile().branchId == getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.toBranchId)
+    ));
   }
   function validInventory(data){
    return data.keys().hasAll(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
@@ -198,7 +205,12 @@ service cloud.firestore {
     }
     match /inventory/{itemId}{
      allow get,list: if canManageInventory(pharmacyId,branchId,"view") || canManageModule(pharmacyId,branchId,"expiryAlerts","view") || canManageModule(pharmacyId,branchId,"reports","view") || canManageModule(pharmacyId,branchId,"stockTransfers","create") || canManageModule(pharmacyId,branchId,"stockTransfers","approve");
-     allow create: if canManageInventory(pharmacyId,branchId,"add")
+     allow create: if (canManageInventory(pharmacyId,branchId,"add") || (
+      request.resource.data.lastTransferId is string
+      && transferApproved(pharmacyId,request.resource.data.lastTransferId)
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.toBranchId == branchId
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
+     ))
       && validInventory(request.resource.data)
       && request.resource.data.createdBy == request.auth.uid
       && request.resource.data.updatedBy == request.auth.uid
@@ -234,7 +246,7 @@ service cloud.firestore {
       && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId))
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId)).data.quantity == request.resource.data.quantity - resource.data.quantity
      ) || (
-      canManageModule(pharmacyId,branchId,"stockTransfers","approve")
+      transferApproved(pharmacyId,request.resource.data.lastTransferId)
       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastTransferId"])
       && request.resource.data.quantity is number && request.resource.data.quantity >= 0
       && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
