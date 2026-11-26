@@ -49,8 +49,9 @@ Build one production Flutter application for Web, Android, and Windows, backed b
 - Gate G — Release: web deployment, Android APK/AAB, Windows build, installation and smoke-test instructions.
 
 ## Current verified repository state (2026-11-26)
-- Added `pharmacy-operations.html` on the production-build branch with branch-scoped supplier and customer CRUD, sales/stock-value reporting with CSV export, expiry/low-stock alerts with review records, and transactional inter-branch stock transfers.
-- Connected Owner and Staff workspaces to these modules and wired the existing staff permission matrix to module access.
+- Added `pharmacy-operations.html` on the production-build branch with branch-scoped supplier and customer CRUD, sales/current-stock-value reporting with CSV export, expiry/low-stock alerts with review records, and transactional inter-branch stock transfers.
+- Connected Owner and Staff workspaces to these modules and wired the existing staff permission matrix to module access. The Owner permission editor now makes `view` a prerequisite for other actions in each module, preventing invisible permissions that staff cannot use.
+- Tightened Stock Transfers: Staff lists are restricted to transfers where their assigned branch is the source or destination; transfer requests require active source/destination branches; approval rejects destination batch-ID collisions unless medicine, batch, barcode and prices match; Firestore Rules enforce the branch visibility and destination batch checks.
 - Extended `firestore.rules` source with tenant/branch-scoped permissions for suppliers, customers, alert reviews, reports and stock transfers. Rules have not been published to Firebase and have not yet passed Emulator Suite tests.
 - JavaScript syntax checks passed for the changed operations, owner, staff, billing and inventory pages. This is a static syntax check only; browser/Firebase end-to-end tests and live deployment remain outstanding.
 - The repository currently contains a functional-looking HTML prototype/workspace for login, owner/staff/super-admin, inventory, and billing. These workflows require further end-to-end validation.
