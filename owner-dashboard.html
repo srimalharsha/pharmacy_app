@@ -48,7 +48,8 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase
 import {getAuth,onAuthStateChanged,signOut,sendSignInLinkToEmail,setPersistence,browserLocalPersistence} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,doc,getDoc,collection,getDocs,query,where,setDoc,updateDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const config={apiKey:"AIzaSyDh6M-yGPJozWWKU1ZImHSPAq-52IrXVxA",authDomain:"channelmed-manager.firebaseapp.com",projectId:"channelmed-manager",storageBucket:"channelmed-manager.firebasestorage.app",messagingSenderId:"859321844496",appId:"1:859321844496:web:f35e6eacc47d30e79d5b95",measurementId:"G-P18LVE9W9T"};
-const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);\nawait setPersistence(auth,browserLocalPersistence);
+const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
+await setPersistence(auth,browserLocalPersistence);
 const errorBox=document.getElementById("error");let ownerProfile=null,ownerPharmacyId=null,ownerBranches=[];const staffMessage=document.getElementById("staffMessage");function staffNote(t,ok=false){staffMessage.textContent=t;staffMessage.style.color=ok?"#23765d":"#93462e";}
 function fail(message){errorBox.textContent=message;errorBox.style.display="block";}
 document.getElementById("logout").addEventListener("click",async()=>{await signOut(auth);location.href="./index.html";});
