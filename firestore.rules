@@ -255,7 +255,7 @@ service cloud.firestore {
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
       && request.resource.data.quantity == resource.data.quantity - getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.quantity
      ) || (
-      canManageModule(pharmacyId,branchId,"stockTransfers","approve")
+      transferApproved(pharmacyId,request.resource.data.lastTransferId)
       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastTransferId"])
       && request.resource.data.quantity is number
       && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
