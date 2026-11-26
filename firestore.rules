@@ -32,9 +32,30 @@ service cloud.firestore {
     && profile().permissions.billing[action] == true
    );
   }
+  function canManageModule(pharmacyId,branchId,module,action){
+   return isPharmacyOwner(pharmacyId) || (
+    isPharmacyMember(pharmacyId) && profile().role == "staff"
+    && profile().branchId == branchId
+    && profile().permissions is map
+    && profile().permissions[module] is map
+    && profile().permissions[module][action] == true
+   );
+  }
+  function validParty(data){
+   return data.keys().hasAll(["name","createdAt","createdBy","updatedAt","updatedBy"])
+    && data.keys().hasOnly(["name","contact","phone","email","address","notes","createdAt","createdBy","updatedAt","updatedBy"])
+    && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+    && data.createdAt is timestamp && data.updatedAt is timestamp
+    && data.createdBy is string && data.updatedBy is string;
+  }
+  function transferApproved(pharmacyId,transferId){
+   return existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId))
+    && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.status == "approved"
+    && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.approvedBy == request.auth.uid;
+  }
   function validInventory(data){
    return data.keys().hasAll(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy"])
-    && data.keys().hasOnly(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy","lastSaleId","lastVoidedSaleId"])
+    && data.keys().hasOnly(["medicineName","genericName","strength","dosageForm","barcode","batchNumber","purchasePrice","sellingPrice","quantity","reorderLevel","expiryDate","createdAt","createdBy","updatedAt","updatedBy","lastSaleId","lastVoidedSaleId","lastTransferId"])
     && data.medicineName is string && data.medicineName.size() >= 1 && data.medicineName.size() <= 120
     && data.genericName is string && data.genericName.size() <= 120
     && data.strength is string && data.strength.size() <= 60
@@ -121,7 +142,7 @@ service cloud.firestore {
     allow get,list: if isActiveSuperAdmin() || isPharmacyMember(pharmacyId);
     allow create,update,delete: if isActiveSuperAdmin();
     match /sales/{saleId}{
-     allow get,list: if canManageBilling(pharmacyId,branchId,"view") || canManageBilling(pharmacyId,branchId,"void");
+     allow get,list: if canManageBilling(pharmacyId,branchId,"view") || canManageBilling(pharmacyId,branchId,"void") || canManageModule(pharmacyId,branchId,"reports","view");
      allow create: if canManageBilling(pharmacyId,branchId,"create")
       && request.resource.data.pharmacyId == pharmacyId
       && request.resource.data.branchId == branchId
@@ -153,8 +174,30 @@ service cloud.firestore {
       allow update,delete: if false;
      }
     }
+    match /suppliers/{supplierId}{
+     allow get,list: if canManageModule(pharmacyId,branchId,"suppliers","view");
+     allow create: if canManageModule(pharmacyId,branchId,"suppliers","add")
+      && validParty(request.resource.data) && request.resource.data.createdBy == request.auth.uid
+      && request.resource.data.updatedBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+     allow update: if canManageModule(pharmacyId,branchId,"suppliers","edit")
+      && validParty(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt
+      && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.updatedAt == request.time;
+     allow delete: if canManageModule(pharmacyId,branchId,"suppliers","delete");
+    }
+    match /customers/{customerId}{
+     allow get,list: if canManageModule(pharmacyId,branchId,"customers","view");
+     allow create: if canManageModule(pharmacyId,branchId,"customers","add")
+      && validParty(request.resource.data) && request.resource.data.createdBy == request.auth.uid
+      && request.resource.data.updatedBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+     allow update: if canManageModule(pharmacyId,branchId,"customers","edit")
+      && validParty(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt
+      && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.updatedAt == request.time;
+     allow delete: if canManageModule(pharmacyId,branchId,"customers","delete");
+    }
     match /inventory/{itemId}{
-     allow get,list: if canManageInventory(pharmacyId,branchId,"view");
+     allow get,list: if canManageInventory(pharmacyId,branchId,"view") || canManageModule(pharmacyId,branchId,"expiryAlerts","view") || canManageModule(pharmacyId,branchId,"reports","view") || canManageModule(pharmacyId,branchId,"stockTransfers","create") || canManageModule(pharmacyId,branchId,"stockTransfers","approve");
      allow create: if canManageInventory(pharmacyId,branchId,"add")
       && validInventory(request.resource.data)
       && request.resource.data.createdBy == request.auth.uid
@@ -190,9 +233,56 @@ service cloud.firestore {
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)).data.status == "voided"
       && existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId))
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(branchId)/sales/$(request.resource.data.lastVoidedSaleId)/items/$(itemId)).data.quantity == request.resource.data.quantity - resource.data.quantity
+     ) || (
+      canManageModule(pharmacyId,branchId,"stockTransfers","approve")
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastTransferId"])
+      && request.resource.data.quantity is number && request.resource.data.quantity >= 0
+      && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.lastTransferId is string && transferApproved(pharmacyId,request.resource.data.lastTransferId)
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId == branchId
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
+      && request.resource.data.quantity == resource.data.quantity - getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.quantity
+     ) || (
+      canManageModule(pharmacyId,branchId,"stockTransfers","approve")
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["quantity","updatedAt","updatedBy","lastTransferId"])
+      && request.resource.data.quantity is number
+      && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
+      && request.resource.data.lastTransferId is string && transferApproved(pharmacyId,request.resource.data.lastTransferId)
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.toBranchId == branchId
+      && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
+      && request.resource.data.quantity == resource.data.quantity + getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.quantity
      );
      allow delete: if canManageInventory(pharmacyId,branchId,"delete");
     }
+   }
+   match /stockTransfers/{transferId}{
+    allow get,list: if isPharmacyOwner(pharmacyId) || (isPharmacyMember(pharmacyId) && profile().role == "staff" && profile().permissions is map && profile().permissions.stockTransfers is map && profile().permissions.stockTransfers.view == true);
+    allow create: if (isPharmacyOwner(pharmacyId) || (
+     isPharmacyMember(pharmacyId) && profile().role == "staff"
+     && profile().permissions is map && profile().permissions.stockTransfers is map
+     && profile().permissions.stockTransfers.create == true
+     && profile().branchId == request.resource.data.fromBranchId
+    ))
+     && request.resource.data.pharmacyId == pharmacyId
+     && request.resource.data.fromBranchId != request.resource.data.toBranchId
+     && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId))
+     && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.toBranchId))
+     && request.resource.data.inventoryId is string
+     && request.resource.data.quantity is int && request.resource.data.quantity > 0
+     && request.resource.data.status == "pending"
+     && request.resource.data.createdBy == request.auth.uid
+     && request.resource.data.createdAt == request.time
+     && request.resource.data.keys().hasOnly(["pharmacyId","fromBranchId","toBranchId","inventoryId","medicineName","batchNumber","quantity","status","createdBy","createdAt"]);
+    allow update: if resource.data.status == "pending" && request.resource.data.status == "approved"
+     && (isPharmacyOwner(pharmacyId) || (
+      isPharmacyMember(pharmacyId) && profile().role == "staff"
+      && profile().permissions is map && profile().permissions.stockTransfers is map
+      && profile().permissions.stockTransfers.approve == true
+      && (profile().branchId == resource.data.fromBranchId || profile().branchId == resource.data.toBranchId)
+     ))
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","approvedBy","approvedAt"])
+     && request.resource.data.approvedBy == request.auth.uid && request.resource.data.approvedAt == request.time;
+    allow delete: if false;
    }
   }
   match /platformConfig/{configId}{allow get,list,create,update: if isActiveSuperAdmin();allow delete: if false;}
