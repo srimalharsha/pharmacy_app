@@ -33,7 +33,7 @@ jobs:
               if not path.exists():
                   continue
               source = path.read_text(encoding="utf-8")
-              blocks = re.findall(r'<script\\s+type=["\\']module["\\']\\s*>(.*?)</script\\s*>', source, re.I | re.S)
+              blocks = re.findall(r"<script\s+type=['\"]module['\"]\s*>(.*?)</script\s*>", source, re.I | re.S)
               for index, block in enumerate(blocks):
                   target = out / f"{path.stem}-{index}.mjs"
                   target.write_text(block, encoding="utf-8")
