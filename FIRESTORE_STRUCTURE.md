@@ -1,100 +1,74 @@
-# ChannelMed Manager — Firestore data structure (design draft)
+# ChannelMed Manager — Firestore data structure
 
-This document defines the tenant-isolated data model before operational collections are enabled. It does not make the current demo a live pharmacy system.
+This document describes the current HTML workflow data paths on the `production-build` branch. The rules in `firestore.rules` are source code only; they are not automatically published to the Firebase project. Test them in the Firebase Emulator before using real pharmacy data.
 
-## 1. Identity and platform administration
+## 1. Identity and roles
 
 ### `platformAdmins/{uid}`
-Created only by a trusted administrator in Firebase Console or a trusted server process. Never created by a public sign-up form.
-
-Fields:
-- `role`: `"superAdmin"`
-- `active`: boolean
-- `createdAt`: server timestamp
-
-A signed-in user may read only their own platform-admin record. Clients cannot create, update, list, or delete these records.
+- `role: "superAdmin"`
+- `active: boolean`
+- Created and maintained by a trusted administrator. Public clients cannot elevate this role.
 
 ### `userProfiles/{uid}`
-Created or changed only by a trusted server process after approval/invitation.
-
-Fields:
-- `role`: `"owner" | "branchManager" | "pharmacist" | "cashier"`
-- `pharmacyId`: pharmacy document ID
-- `branchId`: branch document ID for branch-scoped staff; owner may have no branchId
-- `active`: boolean
-- `displayName`: string
-- `createdAt`, `updatedAt`: server timestamps
-
-A staff profile is assigned to exactly one branch. An owner belongs to one Pharmacy Account and can access its branches.
+- `role: "owner" | "staff"`
+- `pharmacyId`, `branchId` (staff assigned to one branch; owner can manage all branches)
+- `active`, `displayName`, `email`, `permissions`
+- Staff permissions are controlled by the Pharmacy Owner and are also checked by Firestore Rules.
 
 ## 2. Pharmacy accounts and branches
 
-### `pharmacies/{pharmacyId}`
-One document represents one pharmacy business/account (the subscription unit).
+- `pharmacies/{pharmacyId}` — one pharmacy account and subscription unit.
+- `pharmacies/{pharmacyId}/branches/{branchId}` — branch profile and active status.
 
-Suggested fields:
-- `name`, `registrationNumber`, `phone`, `email`, `address`
-- `ownerUid`
-- `status`: `"pending" | "active" | "suspended" | "closed"`
-- `subscriptionId`, `createdAt`, `updatedAt`
+Each branch owns its own operational data. Owners can access branches belonging to their Pharmacy Account; staff access is restricted by their assigned branch except for explicitly authorised cross-branch stock-transfer approval checks.
 
-### `pharmacies/{pharmacyId}/branches/{branchId}`
-Each branch has independent operational records.
+## 3. Branch-scoped collections
 
-Suggested fields:
-- `name`, `code`, `address`, `phone`
-- `active`: boolean
-- `createdAt`, `updatedAt`
+| Collection path | Purpose |
+|---|---|
+| `pharmacies/{pharmacyId}/branches/{branchId}/inventory/{itemId}` | Medicine batch, barcode, batch number, prices, quantity, reorder level, expiry |
+| `.../sales/{saleId}` | Completed/voided sales bill with immutable line-item snapshot |
+| `.../sales/{saleId}/items/{itemId}` | Per-batch quantity snapshot used to verify stock deduction/return |
+| `.../suppliers/{supplierId}` | Supplier contact and notes |
+| `.../customers/{customerId}` | Customer contact and notes |
+| `.../alertReviews/{inventoryId}` | Owner/staff record that an expiry or low-stock alert was reviewed |
 
-Do not put stock, invoices, purchases, or staff records in a shared global collection without tenant and branch authorization checks.
+Suppliers and customers are branch-specific. Sales and inventory records are branch-specific. Sales stock deduction and void stock restoration use Firestore transactions.
 
-## 3. Branch-scoped operational collections
+## 4. Pharmacy-level stock transfers
 
-Use subcollections under the owning Pharmacy Account and, where the data is branch-specific, under its branch:
+### `pharmacies/{pharmacyId}/stockTransfers/{transferId}`
+Fields:
+- `fromBranchId`, `toBranchId`
+- `inventoryId`, `medicineName`, `batchNumber`, `quantity`
+- `status: "pending" | "approved"`
+- `createdBy`, `createdAt`, and on approval `approvedBy`, `approvedAt`
 
-- `pharmacies/{pharmacyId}/branches/{branchId}/medicines/{medicineId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/stockBatches/{batchId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/sales/{saleId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/purchases/{purchaseId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/suppliers/{supplierId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/customers/{customerId}`
-- `pharmacies/{pharmacyId}/branches/{branchId}/stockTransfers/{transferId}`
+A transfer request does not change stock. Approval is performed in one transaction: it verifies the pending request and available source stock, creates or increments the destination batch, deducts the source quantity, and marks the transfer approved. Rules require the same approved transfer reference for both inventory movements.
 
-Each document should include server timestamps and the relevant branch reference where useful. Stock transfers must be recorded as paired, auditable movements from one branch to another; they must not silently edit quantities.
+## 5. Permission matrix
 
-## 4. Registration and subscription collections
+- Suppliers: `view`, `add`, `edit`, `delete`
+- Customers: `view`, `add`, `edit`, `delete`
+- Reports: `view`, `export`
+- Expiry & Alerts: `view`, `manage`
+- Stock Transfers: `view`, `create`, `approve`
 
-### `pharmacyApplications/{applicationId}`
-Stores new pharmacy applications before activation. Suggested fields include applicant UID, pharmacy details, selected package, status (`pending/reviewing/approved/rejected`), and timestamps. Public users must not be able to approve applications or set an active pharmacy role.
+The Owner has full access within their Pharmacy Account. Staff access is granted by their Owner. Hiding a button or module is not security; Firestore Rules must enforce the same permission.
 
-### `subscriptionPlans/{planId}`
-Protected platform configuration for monthly/yearly prices, trial duration, limits, and enabled features. Initial planning values are monthly Rs. 1,500, yearly Rs. 15,000, and 30-day trial; they are not active billing settings until implemented.
+## 6. Registration, subscriptions and platform administration
 
-### `pharmacies/{pharmacyId}/payments/{paymentId}`
-Payment status, method (`bankTransfer/onlineGateway`), receipt reference, amount, currency, review status, and server verification metadata. Never store card numbers, CVVs, or other card credentials.
+- `pharmacyApplications/{uid}` — pharmacy registration and approval status.
+- `subscriptionPlans/{planId}` and `platformConfig/{configId}` — platform pricing, limits, trial and feature settings.
+- `pharmacies/{pharmacyId}/payments/{paymentId}` — planned payment records. Payment confirmation and online gateway webhooks must be performed by a trusted server; never store card numbers or CVVs.
+- `platformAuditLogs/{logId}` — Super Admin audit trail.
 
-## 5. Security principles
+## 7. Security and release boundary
 
-1. Authentication alone does not grant access to pharmacy data.
-2. A user's `userProfiles/{uid}` record must be active and must match the requested `pharmacyId`.
-3. Owners may access permitted data across their own pharmacy's branches.
-4. Branch Managers, Pharmacists, and Cashiers are restricted to their assigned branch and role permissions.
-5. Staff must have exactly one assigned branch. Reassignment is an owner-authorized, audited operation.
-6. Only trusted server-side code may create or elevate roles, approve pharmacy applications, activate subscriptions, or confirm online payments.
-7. UI feature hiding is not security. Firestore rules and trusted server checks must enforce every permission.
-8. Start with deny-by-default rules. Add collection-specific permissions only after each workflow is designed and tested.
-
-## 6. Login routing
-
-After Firebase email/password sign-in:
-1. Read `platformAdmins/{uid}`; if active with role `superAdmin`, open the Super Admin workspace.
-2. Otherwise read `userProfiles/{uid}`; require `active == true`.
-3. Confirm the referenced Pharmacy Account is active.
-4. Route owners to the account workspace and branch staff to their permitted branch workspace.
-5. If no active profile exists, show a clear pending/not-authorized message and do not show operational data.
-
-Email verification is intended for new registration and password recovery flows; it is not required on every normal sign-in.
-
-## 7. Current implementation boundary
-
-The current GitHub Pages site is a demo. Existing Firestore rules intentionally deny all operational data access except a user's own Super Admin registry read. This document is a design baseline, not a deployed permission change. Do not paste permissive rules or enter real pharmacy/customer/medicine data until the secure workflows are implemented and tested.
+1. Require an active authenticated profile and matching Pharmacy Account.
+2. Enforce tenant and branch isolation in Firestore Rules.
+3. Do not let public clients elevate roles, approve pharmacy applications, or confirm payment.
+4. Keep rules deny-by-default.
+5. Run emulator tests for Owner, Staff permission combinations, branch isolation, sales, voids, transfers and invalid writes before deployment.
+6. Publishing this repository's rules to GitHub does not publish them to Firebase Console.
+7. Do not use the live system with real patient/customer/medicine data until the rules are published and tested and the end-to-end release checks pass.
