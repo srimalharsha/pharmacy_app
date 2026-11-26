@@ -48,6 +48,13 @@ service cloud.firestore {
     && data.createdAt is timestamp && data.updatedAt is timestamp
     && data.createdBy is string && data.updatedBy is string;
   }
+  function canApproveTransfers(pharmacyId){
+   return isPharmacyOwner(pharmacyId) || (
+    isPharmacyMember(pharmacyId) && profile().role == "staff"
+    && profile().permissions is map && profile().permissions.stockTransfers is map
+    && profile().permissions.stockTransfers.approve == true
+   );
+  }
   function transferApproved(pharmacyId,transferId){
    return existsAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId))
     && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(transferId)).data.status == "approved"
@@ -204,7 +211,7 @@ service cloud.firestore {
      allow delete: if canManageModule(pharmacyId,branchId,"customers","delete");
     }
     match /inventory/{itemId}{
-     allow get,list: if canManageInventory(pharmacyId,branchId,"view") || canManageModule(pharmacyId,branchId,"expiryAlerts","view") || canManageModule(pharmacyId,branchId,"reports","view") || canManageModule(pharmacyId,branchId,"stockTransfers","create") || canManageModule(pharmacyId,branchId,"stockTransfers","approve");
+     allow get,list: if canManageInventory(pharmacyId,branchId,"view") || canManageModule(pharmacyId,branchId,"expiryAlerts","view") || canManageModule(pharmacyId,branchId,"reports","view") || canManageModule(pharmacyId,branchId,"stockTransfers","create") || canManageModule(pharmacyId,branchId,"stockTransfers","approve") || canApproveTransfers(pharmacyId);
      allow create: if (canManageInventory(pharmacyId,branchId,"add") || (
       request.resource.data.lastTransferId is string
       && transferApproved(pharmacyId,request.resource.data.lastTransferId)
