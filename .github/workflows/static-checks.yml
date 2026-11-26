@@ -1,0 +1,47 @@
+name: ChannelMed static checks
+
+on:
+  push:
+    branches: [production-build]
+  pull_request:
+    branches: [production-build]
+
+jobs:
+  html-module-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check embedded JavaScript modules
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          files = [
+              "index.html", "admin-login.html", "owner-dashboard.html",
+              "staff-dashboard.html", "super-admin.html", "medicine-stock.html",
+              "billing-sales.html", "sales-history.html", "pharmacy-operations.html",
+              "staff-setup.html"
+          ]
+          out = pathlib.Path("/tmp/channelmed-modules")
+          out.mkdir(exist_ok=True)
+          count = 0
+          for name in files:
+              path = pathlib.Path(name)
+              if not path.exists():
+                  continue
+              source = path.read_text(encoding="utf-8")
+              blocks = re.findall(r'<script\\s+type=["\\']module["\\']\\s*>(.*?)</script\\s*>', source, re.I | re.S)
+              for index, block in enumerate(blocks):
+                  target = out / f"{path.stem}-{index}.mjs"
+                  target.write_text(block, encoding="utf-8")
+                  print(f"Checking {name} module {index + 1}")
+                  count += 1
+          if not count:
+              sys.exit("No module scripts were found.")
+          PY
+          for file in /tmp/channelmed-modules/*.mjs; do
+            node --check "$file"
+          done
