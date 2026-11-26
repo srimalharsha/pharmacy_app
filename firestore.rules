@@ -282,6 +282,11 @@ service cloud.firestore {
       && request.resource.data.lastTransferId is string && transferApproved(pharmacyId,request.resource.data.lastTransferId)
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.toBranchId == branchId
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
+      && resource.data.medicineName == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.medicineName
+      && resource.data.batchNumber == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.batchNumber
+      && resource.data.barcode == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.barcode
+      && resource.data.purchasePrice == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.purchasePrice
+      && resource.data.sellingPrice == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.sellingPrice
       && request.resource.data.quantity == resource.data.quantity + getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.quantity
      );
      allow delete: if canManageInventory(pharmacyId,branchId,"delete");
