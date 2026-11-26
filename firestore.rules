@@ -288,7 +288,7 @@ service cloud.firestore {
     }
    }
    match /stockTransfers/{transferId}{
-    allow get,list: if isPharmacyOwner(pharmacyId) || (isPharmacyMember(pharmacyId) && profile().role == "staff" && profile().permissions is map && profile().permissions.stockTransfers is map && profile().permissions.stockTransfers.view == true);
+    allow get,list: if isPharmacyOwner(pharmacyId) || (isPharmacyMember(pharmacyId) && profile().role == "staff" && profile().permissions is map && profile().permissions.stockTransfers is map && profile().permissions.stockTransfers.view == true && (resource.data.fromBranchId == profile().branchId || resource.data.toBranchId == profile().branchId));
     allow create: if (isPharmacyOwner(pharmacyId) || (
      isPharmacyMember(pharmacyId) && profile().role == "staff"
      && profile().permissions is map && profile().permissions.stockTransfers is map
@@ -298,7 +298,9 @@ service cloud.firestore {
      && request.resource.data.pharmacyId == pharmacyId
      && request.resource.data.fromBranchId != request.resource.data.toBranchId
      && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId))
+     && get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)).data.active != false
      && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.toBranchId))
+     && get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.toBranchId)).data.active != false
      && request.resource.data.inventoryId is string
      && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)/inventory/$(request.resource.data.inventoryId))
      && request.resource.data.quantity is int && request.resource.data.quantity > 0
