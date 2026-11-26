@@ -226,6 +226,10 @@ service cloud.firestore {
       && transferApproved(pharmacyId,request.resource.data.lastTransferId)
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.toBranchId == branchId
       && getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.inventoryId == itemId
+      && request.resource.data.medicineName == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.medicineName
+      && request.resource.data.batchNumber == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.batchNumber
+      && request.resource.data.sellingPrice == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.sellingPrice
+      && request.resource.data.purchasePrice == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(getAfter(/databases/$(database)/documents/pharmacies/$(pharmacyId)/stockTransfers/$(request.resource.data.lastTransferId)).data.fromBranchId)/inventory/$(itemId)).data.purchasePrice
      ))
       && validInventory(request.resource.data)
       && request.resource.data.createdBy == request.auth.uid
@@ -296,7 +300,11 @@ service cloud.firestore {
      && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId))
      && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.toBranchId))
      && request.resource.data.inventoryId is string
+     && exists(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)/inventory/$(request.resource.data.inventoryId))
      && request.resource.data.quantity is int && request.resource.data.quantity > 0
+     && request.resource.data.quantity <= get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)/inventory/$(request.resource.data.inventoryId)).data.quantity
+     && request.resource.data.medicineName == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)/inventory/$(request.resource.data.inventoryId)).data.medicineName
+     && request.resource.data.batchNumber == get(/databases/$(database)/documents/pharmacies/$(pharmacyId)/branches/$(request.resource.data.fromBranchId)/inventory/$(request.resource.data.inventoryId)).data.batchNumber
      && request.resource.data.status == "pending"
      && request.resource.data.createdBy == request.auth.uid
      && request.resource.data.createdAt == request.time
